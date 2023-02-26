@@ -1,3 +1,5 @@
+package Client;
+
 import java.io.*;
 import java.net.*;
 import java.util.Scanner;
@@ -5,30 +7,30 @@ import java.util.Scanner;
 public class Client {
 
 	static Scanner scanner = new Scanner(System.in);
-	static Boolean isQuit = false;
+	static Socket socket = null;
+	static PrintWriter printWriter = null;
+	static String userInput = null;
 
 	public static void main(String[] args) throws Exception {
-		System.out.println("");
+		System.out.println();
 		System.out.println("===============");
 		System.out.println("CLIENT STARTED");
 		System.out.println("===============");
 
-		while(!isQuit) {
+		connect();
 
-			try {
-				Socket socket = new Socket("localhost", 4444);
-			
-	        	// send message
+		while(true) {
 
-	        	System.out.println();
-				System.out.println("Send a message: ");
-				String message = scanner.nextLine();
+			System.out.print("\nSend a message: ");
+			userInput = scanner.nextLine();
 
-				if(message.equals("quit")) isQuit = true;
+			if(userInput.equals("quit")) break;
 
-				PrintWriter outputWriter = new PrintWriter(socket.getOutputStream(), true);
-				outputWriter.println(message);
-				outputWriter.close();
+			if(socket == null) connect();
+
+			if(printWriter != null) {
+
+				messageServer(userInput);
 
 				// print server input
 
@@ -42,18 +44,26 @@ public class Client {
 				String line;
 				while(requestReader.ready()) {
 					line = requestReader.readLine();
-	    			System.out.println(line);
+					System.out.println(line);
 				}
 				System.out.println("=================");
 
 				//Thread.sleep(10);
 			}
-			catch(Exception e) {
-				System.out.println("Connection to server refused!");
-			}
-
 		}
 
-		socket.close();
+		if(socket != null) socket.close();
+	}
+	public static void connect() {
+		try {
+			socket = new Socket("localhost", 4444);
+			printWriter = new PrintWriter(socket.getOutputStream(), true);
+		} catch(Exception e) {
+			System.out.println("\nConnection to server refused!");
+		}
+	}
+	public static void messageServer(String message) {
+		printWriter.println(message);
+		printWriter.close();
 	}
 }

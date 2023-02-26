@@ -1,12 +1,13 @@
+package Server;
+
 import java.io.*;
 import java.net.*;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.ArrayList;
 
-public class Server {
-	static User[] user = new User[2];
+public class HTTPServer {
+	static HTTPUser[] user = new HTTPUser[2];
 
 	public static void main(String[] args) throws Exception {
 		ServerSocket serverSocket = new ServerSocket(4444);
@@ -52,7 +53,7 @@ public class Server {
 					allowed = true;
 					InputStream in = socket.getInputStream();
 					OutputStream out = socket.getOutputStream();
-					user[i] = new User(ip, in, out);
+					user[i] = new HTTPUser(ip, in, out);
 					Thread thread = new Thread(user[i]);
 					thread.start();
 					break;
@@ -70,7 +71,7 @@ public class Server {
 	}
 }
 
-class User implements Runnable  {
+class HTTPUser implements Runnable  {
 	InetAddress ip;
 	InputStream in;
 	OutputStream out;
@@ -78,7 +79,7 @@ class User implements Runnable  {
 	long timeStamp = System.currentTimeMillis();
 	boolean expired = false;
 
-	public User(InetAddress ip, InputStream in, OutputStream out) {
+	public HTTPUser(InetAddress ip, InputStream in, OutputStream out) {
 		this.ip = ip;
 		this.in = in;
 		this.out = out;

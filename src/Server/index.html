@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+
+	<title>Hi</title>
+	<style>
+        body {
+            background-color: green;
+        }
+        h1 {
+            font-size: 64px;
+        }
+    </style>
+</head>
+<body>
+
+	<h1>Hello Internets</h1>
+
+    <canvas id="myCanvas" width="500" height="500" style="border:1px solid #000000;"></canvas>
+
+    <script type="text/javascript">
+        
+        var waiting = false;
+        setInterval(function() {
+           if(!waiting) Get("/test", 1000);
+        }, 10);
+
+        function Get(url, timeout) {
+            waiting = true;
+
+            var args = Array.prototype.slice.call(arguments, 3);
+            var xhr = new XMLHttpRequest();
+            xhr.ontimeout = function () {
+                //console.error("The request for " + url + " timed out.");
+                waiting = false;
+            };
+            xhr.onload = function() {
+                //console.error(xhr.statusText);
+                waiting = false;
+            };
+            xhr.open("GET", url, true);
+            xhr.timeout = timeout;
+            xhr.send(null);
+        }
+
+    </script>
+
+</body>
+</html>

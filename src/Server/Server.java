@@ -1,173 +1,155 @@
+package Server;
+
 import java.io.*;
 import java.net.*;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
-public class Server {
-	static User[] user = new User[2];
-
-	public static void main(String[] args) throws Exception {
-		ServerSocket serverSocket = new ServerSocket(4444);
-
-		List<String> whitelist = Arrays.asList(
-			"/127.0.0.1"
-		);
-
-		System.out.println();
-		System.out.println("===============");
-		System.out.println("SERVER STARTED");
-		System.out.println("===============");
-
-		while(true) {
-			// create a new socket for queued connection
-			Socket socket = serverSocket.accept();
-			InetAddress ip = socket.getInetAddress();
-			boolean allowed = false;
-
-			// check white-list
-			for(int i = 0; i < whitelist.size(); i++) {
-				if((ip + "").equals(whitelist.get(i))) allowed = true;
-			}
-			if(!allowed) {
-				System.out.println(ip + " blocked!");
-				continue;
-			}
-
-			// check if already using a socket
-			for(int i = 0; i < user.length; i++) {
-				if(user[i] != null && !user[i].expired) {
-					if(("" + user[i].ip).equals(("" + ip))) allowed = false;
-				}
-			}
-			if(!allowed) {
-				//System.out.println(ip + " already connected!");
-				continue;
-			}
-
-			// allocate thread
-			for(int i = 0; i < user.length; i++) {
-				if(user[i] == null || user[i].expired) {
-					allowed = true;
-					InputStream in = socket.getInputStream();
-					OutputStream out = socket.getOutputStream();
-					user[i] = new User(ip, in, out);
-					Thread thread = new Thread(user[i]);
-					thread.start();
-					break;
-				}
-			}
-			if(!allowed) {
-				System.out.println(ip + " server full!");
-				continue;
-			} else {
-				System.out.println(ip + " connected!");
-			}
-
-        	//socket.close();
+public class Server implements Runnable {
+	public static void main(String[] args) {
+		Server server = new Server(4444);
+		server.addToWhiteList("/127.0.0.1");
+		server.start();
+	}
+	private final int port;
+	private final List<String> whiteList = new ArrayList<>();
+	private final User[] users = new User[2];
+	private final Thread thread = new Thread(this);
+	private ServerSocket serverSocket;
+	public Server(int port) {
+		this.port = port;
+	}
+	public void start() {
+		try {
+			serverSocket = new ServerSocket(this.port);
+			System.out.println();
+			System.out.println("===============");
+			System.out.println("SERVER STARTED");
+			System.out.println("===============\n");
+			this.thread.start();
+		} catch (Exception e) {
+			System.out.println("Failed to open server socket with port: " + this.port);
 		}
+	}
+	public void run() {
+		while (true) {
+
+			User user;
+			try {
+				user = new User(serverSocket.accept());
+			} catch (Exception e) {
+				System.out.println("Failed to find a queued connection!");
+				continue;
+			}
+
+			String ip = user.getIP();
+			System.out.println(ip + " connecting!");
+
+			if (!isWhiteListed(ip)) {
+				System.out.println(ip + " is not white-listed!");
+				continue;
+			}
+			if (isAlreadyConnected(ip)) {
+				System.out.println(ip + " is already connected!");
+				continue;
+			}
+
+			int index = getAvailableIndex();
+			if(index == -1) {
+				System.out.println(ip + " server full!");
+				try {
+					user.socket.close();
+				} catch (IOException e) {
+					System.out.println("Failed to close socket for: " + ip);
+				}
+			} else {
+				try {
+					users[index] = user;
+					user.thread.start();
+					System.out.println(ip + " connected!\n");
+					break;
+				} catch (Exception e) {
+					System.out.println("Failed to create user for " + ip);
+				}
+			}
+		}
+	}
+	public void addToWhiteList(String ip) {
+		this.whiteList.add(ip);
+	}
+	public boolean isAlreadyConnected(String ip) {
+		for (User user : this.users) {
+			if (user != null && !user.expired && (user.getIP()).equals((ip))) {
+				return true;
+			}
+		}
+		return false;
+	}
+	public boolean isWhiteListed(String ip) {
+		for (String whiteListedAddress : this.whiteList) {
+			if ((ip).equals(whiteListedAddress)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	public int getAvailableIndex() {
+		for (int i = 0; i < users.length; i++) {
+			if (users[i] == null || users[i].expired) {
+				return i;
+			}
+		}
+		return -1;
 	}
 }
-
 class User implements Runnable  {
-	InetAddress ip;
-	InputStream in;
-	OutputStream out;
-
-	long timeStamp = System.currentTimeMillis();
+	final Socket socket;
+	private BufferedReader reader;
+	final Thread thread = new Thread(this);
 	boolean expired = false;
-
-	public User(InetAddress ip, InputStream in, OutputStream out) {
-		this.ip = ip;
-		this.in = in;
-		this.out = out;
-	}
-
-	public void run() {
-		while(!expired) {
-			try {
-				BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-
-				String line;
-				while(reader.ready()) {
-					line = reader.readLine();
-	     			//System.out.println(line);
-	     			HandleHTTP(line);
-				}
-
-			} catch(IOException e) {
-				System.out.println(e);
-			}
-
-			if(System.currentTimeMillis() - timeStamp >= 5000) {
-				expired = true;
-				System.out.println(ip + " expired!");
-			}
-		}
-
-	}
-
-	private boolean HandleHTTP(String text) {
-		if(text == null) return false;
-
-		String[] requestParam = text.split(" ");
-		if(requestParam.length > 1 && requestParam[0].equals("GET")) {
-			String[] path = requestParam[1].split("/");
-			route(path);
-		}
-		else return false;
-
-		return true;
-	}
-
-	private void route(String[] path) {
-		if(path.length >= 1) {
-			System.out.println("path: " + path[0]);
-			if(path.length >= 1) {
-				System.out.println("path: " + path[1]);
-			}
-		}
-		else sendPage(out);
-	}
-
-	private void sendPage(OutputStream out) {
+	private final long timeStamp = System.currentTimeMillis();
+	public User(Socket socket) {
+		this.socket = socket;
 		try {
-			File index = new File("index.html");
-			BufferedReader fileReader = new BufferedReader(new FileReader(index));
-
-        	PrintWriter printWriter = new PrintWriter(out, true);
-			printWriter.println("HTTP/1.1 200 OK");
-			printWriter.println("Content-Type: text/html");
-			printWriter.println("Content-Length: " + index.length());
-			printWriter.println("\r\n");
-
-			try {
-				String line = fileReader.readLine();
-				while(line != null) {
-    				printWriter.println(line);
-    				line = fileReader.readLine();
-				}
-			} catch(IOException e) {
-				System.out.println(e);
-			}
-			
-			printWriter.close();
-		} catch(FileNotFoundException e) {
-			System.out.println(e);
+			this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		} catch (Exception e) {
+			System.out.println("Failed to create user for: " + this.getIP());
+			this.expired = true;
 		}
-	
 	}
-
-	// REWORK
-	private static void sendState(OutputStream out) {
-        PrintWriter printWriter = new PrintWriter(out, true);
-        printWriter.println("HTTP/1.1 200 OK");
-		printWriter.println("Content-Type: text/html");
-		printWriter.println("\r\n");
-		//for(int i = 0; i < pixels.size(); i++) {
-			//printWriter.println(pixels.get(i)[0] + "_" + pixels.get(i)[1]);
-		//}
-		printWriter.close();
+	public void run() {
+		while(!this.expired) {
+			this.updateTimestamp();
+			this.printInput();
+		}
+		try {
+			this.socket.close();
+		} catch (Exception e) {
+			System.out.println("Failed to expire and close socket for " + this.getIP());
+		}
+	}
+	private void printInput() {
+		try {
+			if(this.reader.ready()) {
+				System.out.print(this.getIP() + " says: ");
+				while (this.reader.ready()) {
+					System.out.println(this.reader.readLine());
+				}
+				System.out.println();
+			}
+		} catch(Exception e) {
+			this.expired = true;
+			System.out.println("Failed to print input from: " + this.getIP());
+		}
+	}
+	private void updateTimestamp() {
+		if (System.currentTimeMillis() - this.timeStamp >= 1 * 60 * 1000) {
+			this.expired = true;
+			System.out.println(this.getIP() + " expired!");
+		}
+	}
+	public String getIP() {
+		return String.valueOf(this.socket.getInetAddress());
 	}
 }

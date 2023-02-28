@@ -1,7 +1,0 @@
-new server app paradigm.
-
-local side stores state.
-
-gets big update.
-resolves with local state.
-

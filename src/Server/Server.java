@@ -7,11 +7,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Server implements Runnable {
-	public static void main(String[] args) {
-		Server server = new Server(4444);
-		server.addToWhiteList("/127.0.0.1");
-		server.start();
-	}
 	private final int port;
 	private final List<String> whiteList = new ArrayList<>();
 	private final User[] users = new User[2];
@@ -52,12 +47,12 @@ public class Server implements Runnable {
 			}
 			if (isAlreadyConnected(ip)) {
 				System.out.println(ip + " is already connected!");
-				continue;
+				//continue;
 			}
 
 			int index = getAvailableIndex();
 			if(index == -1) {
-				System.out.println(ip + " server full!");
+				System.out.println(ip + " server full!\n");
 				try {
 					user.socket.close();
 				} catch (IOException e) {
@@ -66,9 +61,9 @@ public class Server implements Runnable {
 			} else {
 				try {
 					users[index] = user;
+					user.messageUser("Welcome to the server!");
 					user.thread.start();
 					System.out.println(ip + " connected!\n");
-					break;
 				} catch (Exception e) {
 					System.out.println("Failed to create user for " + ip);
 				}
@@ -105,14 +100,16 @@ public class Server implements Runnable {
 }
 class User implements Runnable  {
 	final Socket socket;
-	private BufferedReader reader;
+	private PrintWriter printWriter;
+	private BufferedReader bufferedReader;
 	final Thread thread = new Thread(this);
 	boolean expired = false;
 	private final long timeStamp = System.currentTimeMillis();
 	public User(Socket socket) {
 		this.socket = socket;
 		try {
-			this.reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+			this.printWriter = new PrintWriter(this.socket.getOutputStream(), true);
+			this.bufferedReader = new BufferedReader(new InputStreamReader(this.socket.getInputStream()));
 		} catch (Exception e) {
 			System.out.println("Failed to create user for: " + this.getIP());
 			this.expired = true;
@@ -121,20 +118,33 @@ class User implements Runnable  {
 	public void run() {
 		while(!this.expired) {
 			this.updateTimestamp();
-			this.printInput();
+			this.printUserInput();
 		}
+		this.disconnect();
+	}
+	public void disconnect() {
 		try {
 			this.socket.close();
+			this.printWriter.close();
+			this.bufferedReader.close();
+			System.out.println(this.getIP() + " was dis-connected!\n");
 		} catch (Exception e) {
-			System.out.println("Failed to expire and close socket for " + this.getIP());
+			System.out.println(this.getIP() + " failed to dis-connect!\n");
 		}
 	}
-	private void printInput() {
+	public void messageUser(String message) {
 		try {
-			if(this.reader.ready()) {
+			this.printWriter.println(message);
+		} catch(Exception e) {
+			System.out.println("Failed to send message to user: " + this.getIP());
+		}
+	}
+	private void printUserInput() {
+		try {
+			if(this.bufferedReader.ready()) {
 				System.out.print(this.getIP() + " says: ");
-				while (this.reader.ready()) {
-					System.out.println(this.reader.readLine());
+				while (this.bufferedReader.ready()) {
+					System.out.println(this.bufferedReader.readLine());
 				}
 				System.out.println();
 			}

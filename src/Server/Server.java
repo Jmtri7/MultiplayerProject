@@ -62,6 +62,7 @@ public class Server implements Runnable {
 				try {
 					users[index] = user;
 					user.messageUser("Welcome to the server!");
+					user.messageUser("Blah!");
 					user.thread.start();
 					System.out.println(ip + " connected!\n");
 				} catch (Exception e) {
